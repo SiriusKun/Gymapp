@@ -208,9 +208,37 @@ function cancelSession(){if(confirm("¿Cancelar esta sesión?")){sessionDraft=nu
 function renderRoutines(){document.getElementById("rutinas").innerHTML=`<div class="top-action"><div><div class="section-label">TU PLAN</div><h2 class="page-heading">Rutinas</h2></div><button class="add-round" onclick="newRoutine()">＋</button></div><div class="routine-stack">${state.routines.map((r,i)=>`<div class="routine-card"><div class="routine-card-top"><div class="routine-mark">${["↘","↗","↔","◈","◆"][i%5]}</div><div class="routine-main"><h3>${esc(r.name)||"Sin nombre"}</h3><span>${r.exercises.length} ejercicios</span></div><button class="more-btn" onclick="editRoutine(${r.id})">Editar</button></div><div class="routine-tags">${r.exercises.map(e=>`<span class="tag">${esc(e)}</span>`).join("")}</div><button class="routine-start" onclick="startSession(${r.id})"><span>Comenzar rutina</span><b>→</b></button><button class="danger routine-delete" onclick="deleteRoutine(${r.id})">Eliminar rutina</button></div>`).join("")||`<div class="empty">Aún no tienes rutinas. Pulsa ＋ para crear la primera.</div>`}</div>`}
 function newRoutine(){editingRoutine={id:null,name:"",exercises:[]};routineModal()}
 function editRoutine(id){editingRoutine=JSON.parse(JSON.stringify(state.routines.find(r=>r.id===id)));routineModal()}
-function routineModal(){let r=editingRoutine;openModal(`<h2>${r.id?"Editar":"Nueva"} rutina</h2><label class="sub">Nombre</label><input id="rname" value="${esc(r.name)}" placeholder="Ej. Pecho y tríceps"><h3 style="margin-top:16px">Ejercicios</h3><div>${r.exercises.map((e,i)=>`<span class="tag">${esc(e)} <button onclick="editingRoutine.exercises.splice(${i},1);routineModal()">×</button></span>`).join("")}</div><input id="addEx" list="exlist" placeholder="Agregar ejercicio"><datalist id="exlist">${exPool.map(e=>`<option value="${esc(e)}">`).join("")}</datalist><button class="secondary" style="width:100%;margin-top:7px" onclick="addRoutineEx()">＋ Agregar</button><div class="actions"><button class="secondary" onclick="closeModal()">Cancelar</button><button onclick="saveRoutine()">Guardar</button></div>`)}
-function addRoutineEx(){let v=document.getElementById("addEx").value.trim();if(v&&!editingRoutine.exercises.includes(v))editingRoutine.exercises.push(v);routineModal()}
-function saveRoutine(){let n=document.getElementById("rname").value.trim();if(!n||!editingRoutine.exercises.length)return toast("Pon nombre y al menos un ejercicio");if(editingRoutine.id){let i=state.routines.findIndex(r=>r.id===editingRoutine.id);state.routines[i]=editingRoutine}else state.routines.push({...editingRoutine,id:Date.now(),demo:false});save();closeModal();render()}
+function routineModal(){
+ let r=editingRoutine;
+ openModal(`<h2>${r.id?"Editar":"Nueva"} rutina</h2>
+ <label class="sub">Nombre</label>
+ <input id="rname" value="${esc(r.name||"")}" placeholder="Ej. Pecho y tríceps" oninput="editingRoutine.name=this.value">
+ <h3 style="margin-top:16px">Ejercicios</h3>
+ <div>${r.exercises.map((e,i)=>`<span class="tag">${esc(e)} <button onclick="editingRoutine.exercises.splice(${i},1);routineModal()">×</button></span>`).join("")||`<div class="empty" style="padding:12px 0;text-align:left">Aún no has añadido ejercicios.</div>`}</div>
+ <input id="addEx" list="exlist" placeholder="Agregar ejercicio" onkeydown="if(event.key==='Enter'){event.preventDefault();addRoutineEx()}">
+ <datalist id="exlist">${exPool.map(e=>`<option value="${esc(e)}">`).join("")}</datalist>
+ <button class="secondary" style="width:100%;margin-top:7px" onclick="addRoutineEx()">＋ Agregar ejercicio</button>
+ <div class="actions"><button class="secondary" onclick="closeModal()">Cancelar</button><button onclick="saveRoutine()">Guardar rutina</button></div>`)
+}
+function addRoutineEx(){
+ let nameInput=document.getElementById("rname");
+ if(nameInput) editingRoutine.name=nameInput.value;
+ let input=document.getElementById("addEx"),v=input?input.value.trim():"";
+ if(v&&!editingRoutine.exercises.includes(v)) editingRoutine.exercises.push(v);
+ routineModal();
+}
+function saveRoutine(){
+ let nameInput=document.getElementById("rname");
+ let n=(nameInput?nameInput.value:editingRoutine.name||"").trim();
+ editingRoutine.name=n;
+ if(!n)return toast("Ponle un nombre a la rutina");
+ if(!editingRoutine.exercises.length)return toast("Agrega al menos un ejercicio");
+ if(editingRoutine.id){
+   let i=state.routines.findIndex(r=>r.id===editingRoutine.id);
+   if(i>=0) state.routines[i]={...editingRoutine,name:n};
+ }else state.routines.push({...editingRoutine,id:Date.now(),demo:false,name:n});
+ save();closeModal();render();toast("Rutina guardada");
+}
 function deleteRoutine(id){if(confirm("¿Borrar esta rutina?")){state.routines=state.routines.filter(r=>r.id!==id);save();render()}}
 
 function exerciseHistory(ex){return state.sessions.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(s=>{let e=s.sets.find(x=>x.exercise===ex);if(!e)return null;return {date:s.date,max:Math.max(...e.sets.map(x=>+x.w||0)),vol:e.sets.reduce((a,x)=>a+(+x.w||0)*(+x.r||0),0)}}).filter(Boolean)}
