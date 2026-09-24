@@ -71,7 +71,7 @@ input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}.calhead{text-align:center;color:#999;font-size:10px;font-weight:800;padding:4px}
 .day{aspect-ratio:1;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:650}
 .day.work{background:var(--accent);color:#fff;font-weight:900;box-shadow:0 4px 10px #6257f433}.day.today{outline:2px solid #b9bcc5}.day.empty{visibility:hidden}
-.session-mini{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:11px 0;font-size:13px}.session-mini:last-child{border:0}
+.history-list{max-height:390px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:2px}.history-list::-webkit-scrollbar{width:5px}.history-list::-webkit-scrollbar-thumb{background:#d2d5cd;border-radius:99px}.session-mini{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:11px 0;font-size:13px}.session-mini:last-child{border:0}.session-mini .session-label{min-width:0;flex:1}.session-mini .session-label span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.session-mini .session-actions{display:flex;align-items:center;gap:2px;flex:0 0 auto}.session-edit{background:#f0f1eb!important;color:#30332f!important;border-radius:9px!important;padding:7px 9px!important;font-size:10px!important;font-weight:850!important;box-shadow:none!important}.history-note{font-size:9px;color:#9a9d96;margin-top:8px;text-align:center}
 .empty{text-align:center;color:var(--muted);padding:25px 8px;font-size:13px}
 .note{background:#fff8dc;border:1px solid #f0dfa0;border-radius:12px;padding:10px;font-size:12px;color:#695a22}
 /* Navigation */
@@ -124,7 +124,7 @@ const exampleRoutines=[
 {id:3,name:"Tirón",exercises:["Jalón al pecho","Remo T-bar","Remo bajo Hammer","Curl con barra","Curl predicador"]}
 ];
 const exPool=[...new Set(exampleRoutines.flatMap(r=>r.exercises)),"Extensión de cuádriceps","Elevaciones laterales","Fondos","Abdominales"];
-let state=load(), currentTab="registrar", editingRoutine=null, sessionDraft=null, calDate=new Date();
+let state=load(), currentTab="registrar", editingRoutine=null, sessionDraft=null, editingSession=null, calDate=new Date();
 
 function load(){
  let x=localStorage.getItem(KEY); if(x){let data=JSON.parse(x);if(!data.version){const rs=data.routines||[],ss=data.sessions||[];const legacy=ss.length===12&&rs.length===3&&rs.every((r,i)=>r.id===exampleRoutines[i].id&&r.name===exampleRoutines[i].name&&JSON.stringify(r.exercises)===JSON.stringify(exampleRoutines[i].exercises));if(legacy)ss.forEach(s=>s.demo=true);data.version=2;localStorage.setItem(KEY,JSON.stringify(data));}return data;}
@@ -171,7 +171,7 @@ function renderRegistrar(){
  let el=document.getElementById("registrar");
  if(!sessionDraft){
   el.innerHTML=`<div class="hero"><div class="section-label" style="color:#b6baaf">HOY</div><div class="hero-title">Entrena. Registra.<br><span>Mejora.</span></div><p>Todo tu progreso, sin perder tiempo entre series.</p><div class="hero-stats"><div><b>${state.sessions.length}</b><small>sesiones</small></div><div><b>${fmt(state.sessions.reduce((a,s)=>a+volSession(s),0))}</b><small>kg totales</small></div><div><b>${state.routines.length}</b><small>rutinas</small></div></div></div><div class="converter-card"><div class="converter-head"><div class="converter-title">Convertidor de peso<small>Para discos y máquinas en libras</small></div><span class="converter-badge">LB ↔ KG</span></div><div class="converter-grid"><div class="converter-field"><label>LIBRAS (LB)</label><input id="lbConverter" inputmode="decimal" type="number" step="0.1" placeholder="0" oninput="convertLb()"></div><div class="converter-eq">=</div><div class="converter-field"><label>KILOGRAMOS (KG)</label><input id="kgConverter" inputmode="decimal" type="number" step="0.1" placeholder="0" oninput="convertKg()"></div></div><div class="converter-chips"><button class="converter-chip" onclick="setLb(5)">5 lb</button><button class="converter-chip" onclick="setLb(10)">10 lb</button><button class="converter-chip" onclick="setLb(20)">20 lb</button><button class="converter-chip" onclick="setLb(25)">25 lb</button><button class="converter-chip" onclick="setLb(45)">45 lb</button><button class="converter-chip" onclick="setLb(50)">50 lb</button><button class="converter-chip" onclick="setLb(100)">100 lb</button></div><div class="converter-note">1 lb = 0,45359237 kg · El resultado se muestra con hasta 2 decimales.</div></div><div class="section-label">EMPEZAR ENTRENAMIENTO</div><div class="card start-card"><h2>¿Qué vas a entrenar?</h2><div class="routine-grid">${state.routines.map((r,i)=>{let icons=["↘","↗","↔","◈","◆"];return `<button class="routine-launch" onclick="startSession(${r.id})"><span class="launch-icon">${icons[i%icons.length]}</span><span class="launch-name">${esc(r.name)||"Sin nombre"}</span><span class="launch-meta"><span>${r.exercises.length} ejercicios</span><b>→</b></span></button>`}).join("")}</div><button class="free-launch" onclick="startFree()"><span>＋</span><div><b>Sesión libre</b><small>Elige tus ejercicios al empezar</small></div><strong>→</strong></button></div>
-  <div class="card"><div class="between row"><h3>Últimas sesiones</h3><span class="sub">${state.sessions.length} SESIONES</span></div>${state.sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6).map(s=>`<div class="session-mini"><span>${dateFmt(s.date)} · ${esc(s.routine||"Libre")}</span><b>${fmt(volSession(s))} kg</b><button class="icon-delete" onclick="deleteSession(${s.id})">×</button></div>`).join("")}</div>`;
+  <div class="card"><div class="between row"><h3>Historial de sesiones</h3><span class="sub">${state.sessions.length} SESIONES</span></div><div class="history-list">${state.sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div class="session-mini"><div class="session-label"><span>${dateFmt(s.date)} · ${esc(s.routine||"Libre")}</span><small>${fmt(volSession(s))} kg</small></div><div class="session-actions"><button class="session-edit" onclick="editSession(${s.id})">Editar</button><button class="icon-delete" onclick="deleteSession(${s.id})">×</button></div></div>`).join("")}</div><div class="history-note">Desliza dentro del historial para ver todas tus sesiones.</div></div>`;
   return;
  }
  let done=sessionDraft.sets.filter(e=>e.exercise).length;
@@ -265,6 +265,37 @@ function renderSummary(){let total=state.sessions.reduce((a,s)=>a+volSession(s),
 function exportJSON(){let blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="gymlog-backup.json";a.click();URL.revokeObjectURL(a.href)}
 document.getElementById("importFile").onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!x.routines||!x.sessions)throw 0;state=x;save();render();toast("Datos importados")}catch{alert("Ese archivo no parece un respaldo válido de GymLog.")}};r.readAsText(f);e.target.value=""}
 function resetData(){const ds=state.sessions.filter(s=>s.demo).length,dr=state.routines.filter(r=>r.demo).length;if(!ds&&!dr)return toast("No quedan datos de ejemplo");if(confirm(`¿Borrar los datos de ejemplo? Se eliminarán ${ds} sesiones y ${dr} rutinas de demostración. Tus registros reales se conservarán.`)){state.sessions=state.sessions.filter(s=>!s.demo);state.routines=state.routines.filter(r=>!r.demo);save();render();toast("Datos de ejemplo eliminados")}}
+function editSession(id){
+ let s=state.sessions.find(x=>x.id===id); if(!s)return;
+ editingSession=JSON.parse(JSON.stringify(s));
+ sessionEditModal();
+}
+function sessionEditModal(){
+ let s=editingSession;
+ openModal(`<h2>Editar sesión</h2>
+ <label class="sub">Fecha</label>
+ <input id="esDate" type="date" value="${esc(s.date)}" oninput="editingSession.date=this.value">
+ <label class="sub" style="display:block;margin-top:12px">Nombre de la sesión</label>
+ <input id="esName" value="${esc(s.routine||'Sesión libre')}" placeholder="Ej. Pecho y tríceps" oninput="editingSession.routine=this.value">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px"><h3 style="margin:0">Ejercicios</h3><button class="secondary small" onclick="addEditExercise()">＋ Ejercicio</button></div>
+ <div>${s.sets.map((e,i)=>editExerciseBlock(e,i)).join('')||`<div class="empty" style="padding:14px 0">Esta sesión no tiene ejercicios.</div>`}</div>
+ <div class="actions"><button class="secondary" onclick="editingSession=null;closeModal()">Cancelar</button><button onclick="saveEditedSession()">Guardar cambios</button></div>`);
+}
+function editExerciseBlock(e,i){
+ return `<div class="card" style="margin:10px 0;padding:12px"><div class="row between"><input value="${esc(e.exercise||'')}" placeholder="Nombre del ejercicio" oninput="editingSession.sets[${i}].exercise=this.value"><button class="danger small" onclick="editingSession.sets.splice(${i},1);sessionEditModal()">Eliminar</button></div>${e.sets.map((x,j)=>`<div class="series-row" style="grid-template-columns:28px 1fr 1fr 32px"><div class="num">${j+1}</div><input inputmode="decimal" type="number" step="0.1" value="${esc(x.w??'')}" placeholder="kg" oninput="editingSession.sets[${i}].sets[${j}].w=this.value"><input inputmode="numeric" type="number" step="1" value="${esc(x.r??'')}" placeholder="reps" oninput="editingSession.sets[${i}].sets[${j}].r=this.value"><button class="x" onclick="editingSession.sets[${i}].sets.splice(${j},1);if(!editingSession.sets[${i}].sets.length)editingSession.sets[${i}].sets.push({w:'',r:''});sessionEditModal()">×</button></div>`).join('')}<button class="secondary small" style="width:100%;margin-top:4px" onclick="editingSession.sets[${i}].sets.push({w:'',r:''});sessionEditModal()">＋ Serie</button></div>`;
+}
+function addEditExercise(){editingSession.sets.push({exercise:'',sets:[{w:'',r:''}]});sessionEditModal()}
+function saveEditedSession(){
+ let dateInput=document.getElementById('esDate'), nameInput=document.getElementById('esName');
+ if(dateInput)editingSession.date=dateInput.value;
+ if(nameInput)editingSession.routine=nameInput.value.trim()||'Sesión libre';
+ if(!editingSession.date)return toast('Selecciona una fecha');
+ editingSession.sets=editingSession.sets.filter(e=>e.exercise&&e.exercise.trim()).map(e=>({...e,exercise:e.exercise.trim(),sets:e.sets.filter(x=>(+x.w||0)>0&&(+x.r||0)>0)})).filter(e=>e.sets.length);
+ if(!editingSession.sets.length)return toast('La sesión necesita al menos una serie válida');
+ let i=state.sessions.findIndex(x=>x.id===editingSession.id);
+ if(i<0)return toast('No se encontró la sesión');
+ state.sessions[i]=editingSession;save();editingSession=null;closeModal();render();toast('Sesión actualizada');
+}
 function deleteSession(id){if(confirm("¿Borrar esta sesión? Esta acción no se puede deshacer.")){state.sessions=state.sessions.filter(s=>s.id!==id);save();render();toast("Sesión eliminada")}}
 render();
 </script>
